@@ -1,0 +1,1209 @@
+#+TITLE: My Emacs Config
+#+AUTHOR: Gopesh Sharma
+#+PROPERTY: header-args :tangle "~/.config/emacs/init.el"
+
+* TODOs
+- [ ] package management
+- [ ] UI
+- [ ] evil
+- [ ] nano-sidebar
+
+* CORE
+** Header 
+This will generate a header at the top of the tangled file to indicate it is generated and is not meant to be modified directly.
+#+begin_src emacs-lisp
+  ;; -*- lexical-binding: t -*-
+  ;; This file has been generated from dotemacs.org file. DO NOT EDIT.
+  ;; Sources are available from https://github.com/rougier/dotemacs
+
+  ;; Copyright (C) 2022 Nicolas P. Rougier
+
+  ;; This file is free software; you can redistribute it and/or modify
+  ;; it under the terms of the GNU General Public License as published by
+  ;; the Free Software Foundation; either version 3, or (at your option)
+  ;; any later version.
+
+  ;; This file is distributed in the hope that it will be useful,
+  ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ;; GNU General Public License for more details.
+
+  ;; For a full copy of the GNU General Public License
+  ;; see <https://www.gnu.org/licenses/>.
+#+end_src
+
+** Early Init
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle "~/.config/emacs/early-init.el"
+:END:
+This code is meant to go to the early-init.el file.
+#+begin_src emacs-lisp
+  (setq
+   site-run-file nil                         ; No site-wide run-time initializations. 
+   inhibit-default-init t                    ; No site-wide default library
+   gc-cons-threshold most-positive-fixnum    ; Very large threshold for garbage
+					     ; collector during init
+   package-enable-at-startup nil)            ; We'll use straight.el
+
+  (setq native-comp-eln-load-path
+	(list (expand-file-name "eln-cache" user-emacs-directory)))
+
+  ;; Reset garbage collector limit after init process has ended (8Mo)
+  (add-hook 'after-init-hook
+	    #'(lambda () (setq gc-cons-threshold (* 8 1024 1024))))
+#+end_src 
+
+** Package Management
+Using straight.el for package management and disable checking (for speedup).
+#+begin_src emacs-lisp
+  (setq straight-check-for-modifications nil)
+#+end_src
+
+#+begin_src emacs-lisp
+  (let ((bootstrap-file
+	 (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
+	(bootstrap-version 5))
+    (unless (file-exists-p bootstrap-file)
+      (with-current-buffer
+	  (url-retrieve-synchronously
+	   "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+	   'silent 'inhibit-cookies)
+	(goto-char (point-max))
+	(eval-print-last-sexp)))
+    (load bootstrap-file nil 'nomessage))
+#+end_src
+
+** Package Installation
+#+begin_src emacs-lisp
+  (setq package-list
+    '(cape                ; Completion At Point Extensions
+      orderless           ; Completion style for matching regexps in any order
+      vertico             ; VERTical Interactive COmpletion
+      marginalia          ; Enrich existing commands with completion annotations
+      all-the-icons
+      rainbow-delimiters
+      consult             ; Consulting completing-read
+      corfu               ; Completion Overlay Region FUnction
+      deft                ; Quickly browse, filter, and edit plain text notes
+      f                   ; Modern API for working with files and directories
+      flyspell-correct-popup ; Correcting words with flyspell via popup interface
+      flyspell-popup      ; Correcting words with Flyspell in popup menus
+      evil
+      general
+      guess-language      ; Robust automatic language detection
+      helpful             ; A better help buffer
+      htmlize             ; Convert buffer text and decorations to HTML
+      mini-frame          ; Show minibuffer in child frame on read-from-minibuffer
+      imenu-list          ; Show imenu entries in a separate buffer
+      magit               ; A Git porcelain inside Emacs.
+      markdown-mode       ; Major mode for Markdown-formatted text
+      vterm               ; Managing multiple terminal buffers in Emacs.
+      use-package         ; A configuration macro for simplifying your .emacs
+      vc-backup           ; VC backend for versioned backups
+      yaml-mode           ; YAML mode
+      consult-recoll      ; Consult interface for recoll query
+      org-auto-tangle     ; Tangle org file when it is saved
+      exec-path-from-shell; Get environment variables such as $PATH from the shell 
+      which-key))         ; Display available keybindings in popup
+
+  ;; Install packages that are not yet installed
+  (dolist (package package-list)
+    (straight-use-package package))
+
+  ;; Special case for pdf-tools that has recently (2022) changed maintainer
+  (straight-use-package
+   '(pdf-tools :type git :host github :repo "vedang/pdf-tools"))
+
+  ;; Denote not yet on ELPA (2022-06-19)
+  (straight-use-package
+   '(denote :type git :host github :repo "protesilaos/denote"))
+
+  ;; NANO splash
+  (straight-use-package
+   '(nano-splash :type git :host github :repo "rougier/nano-splash"))
+
+  ;; NANO theme
+  (straight-use-package
+   '(nano-theme :type git :host github :repo "rougier/nano-theme"))
+
+  ;; org-margin
+  (straight-use-package
+   '(org-margin :type git :host github :repo "rougier/org-margin"))
+
+  ;; NANO modeline
+  (straight-use-package
+   '(nano-modeline :type git :host github :repo "rougier/nano-modeline"))
+
+  ;; SVG tags, progress bars & icons
+  (straight-use-package
+   '(svg-lib :type git :host github :repo "rougier/svg-lib"))
+
+  ;; Replace keywords with SVG tags
+  (straight-use-package
+   '(svg-tag-mode :type git :host github :repo "rougier/svg-tag-mode"))
+
+  ;; Minibuffer Mode
+  (straight-use-package
+   '(minibuffer-header :type git :host github :repo "rougier/minibuffer-header"))
+#+end_src
+
+** Startup
+Emacs does a lot of things at startup and here, we disable pretty much everything.
+#+begin_src emacs-lisp
+  (setq-default
+   inhibit-startup-screen t               ; Disable start-up screen
+   inhibit-startup-message t              ; Disable startup message
+   inhibit-startup-echo-area-message t    ; Disable initial echo message
+   initial-scratch-message ""             ; Empty the initial *scratch* buffer
+   initial-buffer-choice t)               ; Open *scratch* buffer at init
+#+end_src
+
+** Encoding
+We tell emacs to use UTF-8 encoding as much as possible.
+#+begin_src emacs-lisp
+  (set-default-coding-systems 'utf-8)     ; Default to utf-8 encoding
+  (prefer-coding-system       'utf-8)     ; Add utf-8 at the front for automatic detection.
+  (set-terminal-coding-system 'utf-8)     ; Set coding system of terminal output
+  (set-keyboard-coding-system 'utf-8)     ; Set coding system for keyboard input on TERMINAL
+  (set-language-environment "English")    ; Set up multilingual environment
+#+end_src
+
+** Recovery
+If Emacs or the computer crashes, you can recover the files you were editing at the time of the crash from their auto-save files. To do this, start Emacs again and type the command M-x recover-session. Here, we parameterize how files are saved in the background.
+#+begin_src emacs-lisp
+  (setq auto-save-list-file-prefix ; Prefix for generating auto-save-list-file-name
+	(expand-file-name ".auto-save-list/.saves-" user-emacs-directory)
+	auto-save-default t        ; Auto-save every buffer that visits a file
+	auto-save-timeout 20       ; Number of seconds between auto-save
+	auto-save-interval 200)    ; Number of keystrokes between auto-saves
+#+end_src
+
+** Backup
+Emacs carefully copies the old contents to another file, called the “backup” file, before actually saving. Emacs makes a backup for a file only the first time the file is saved from a buffer. No matter how many times you subsequently save the file, its backup remains unchanged. However, if you kill the buffer and then visit the file again, a new backup file will be made. Here, we activate backup and parameterize the number of backups to keep.
+#+begin_src emacs-lisp
+  (setq backup-directory-alist       ; File name patterns and backup directory names.
+	`(("." . ,(expand-file-name "backups" user-emacs-directory)))
+	make-backup-files t          ; Backup of a file the first time it is saved.
+	vc-make-backup-files t       ; No backup of files under version contr
+	backup-by-copying t          ; Don't clobber symlinks
+	version-control t            ; Version numbers for backup files
+	delete-old-versions t        ; Delete excess backup files silently
+	kept-old-versions 6          ; Number of old versions to keep
+	kept-new-versions 9          ; Number of new versions to keep
+	delete-by-moving-to-trash t) ; Delete files to trash
+
+  ;; Back
+  (require 'vc-backup)
+#+end_src
+
+** Recent Files
+50 Recents files with some exclusion (regex patterns).
+#+begin_src emacs-lisp
+  (require 'recentf)
+
+  (setq recentf-max-menu-items 10
+	recentf-max-saved-items 100
+	;;	recentf-exclude '("/Users/rougier/Documents/Mail.+"
+	;;			  "/Users/rougier/Documents/Notes.+")
+	)
+
+  (let (message-log-max)
+      (recentf-mode 1))
+#+end_src
+
+** History
+Remove text properties for kill ring entries (see https://emacs.stackexchange.com/questions/4187). This saves a lot of time when loading it.
+#+begin_src emacs-lisp
+  (defun unpropertize-kill-ring ()
+    (setq kill-ring (mapcar 'substring-no-properties kill-ring)))
+
+  (add-hook 'kill-emacs-hook 'unpropertize-kill-ring)
+#+end_src
+
+We save every possible history we can think of.
+#+begin_src emacs-lisp
+  (require 'savehist)
+
+  (setq kill-ring-max 50
+	history-length 50)
+
+  (setq savehist-additional-variables
+	'(kill-ring
+	  command-history
+	  set-variable-value-history
+	  custom-variable-history   
+	  query-replace-history     
+	  read-expression-history   
+	  minibuffer-history        
+	  read-char-history         
+	  face-name-history         
+	  bookmark-history
+	  file-name-history))
+
+   (put 'minibuffer-history         'history-length 50)
+   (put 'file-name-history          'history-length 50)
+   (put 'set-variable-value-history 'history-length 25)
+   (put 'custom-variable-history    'history-length 25)
+   (put 'query-replace-history      'history-length 25)
+   (put 'read-expression-history    'history-length 25)
+   (put 'read-char-history          'history-length 25)
+   (put 'face-name-history          'history-length 25)
+   (put 'bookmark-history           'history-length 25)
+#+end_src
+
+No duplicates in history
+#+begin_src emacs-lisp
+  (setq history-delete-duplicates t)
+#+end_src
+
+Start history mode.
+#+begin_src emacs-lisp
+  (let (message-log-max)
+    (savehist-mode))
+#+end_src
+
+** Cursor
+Record cursor position from one session ot the other
+#+begin_src emacs-lisp
+  (setq save-place-file (expand-file-name "saveplace" user-emacs-directory)
+	save-place-forget-unreadable-files t)
+
+  (save-place-mode 1)
+#+end_src
+
+** Customization
+Since init.el will be generated from this file, we save customization in a dedicated file.
+#+begin_src emacs-lisp
+  (setq custom-file (concat user-emacs-directory "custom.el"))
+
+  (when (file-exists-p custom-file)
+    (load custom-file nil t))
+#+end_src
+
+** Mini Frame
+A set of functions to create a mini-frame over the header line.
+#+begin_src emacs-lisp
+  (defun my/mini-frame (&optional height foreground background border)
+    "Create a child frame positionned over the header line whose
+  width corresponds to the width of the current selected window.
+
+  The HEIGHT in lines can be specified, as well as the BACKGROUND
+  color of the frame. BORDER width (pixels) and color (FOREGROUND)
+  can be also specified."
+  
+    (interactive)
+    (let* ((foreground (or foreground
+			   (face-foreground 'font-lock-comment-face nil t)))
+	   (background (or background (face-background 'highlight nil t)))
+	   (border (or border 1))
+	   (height (round (* (or height 8) (window-font-height))))
+	   (edges (window-pixel-edges))
+	   (body-edges (window-body-pixel-edges))
+	   (top (nth 1 edges))
+	   (bottom (nth 3 body-edges))
+	   (left (- (nth 0 edges) (or left-fringe-width 0)))
+	   (right (+ (nth 2 edges) (or right-fringe-width 0)))
+	   (width (- right left))
+
+	   ;; Window divider mode
+	   (width (- width (if (and (bound-and-true-p window-divider-mode)
+				    (or (eq window-divider-default-places 'right-only)
+					(eq window-divider-default-places t))
+				  (window-in-direction 'right (selected-window)))
+			       window-divider-default-right-width
+			     0)))
+	   (y (- top border))
+	   (child-frame-border (face-attribute 'child-frame-border :background)))
+      (set-face-attribute 'child-frame-border t :background foreground)
+      (let ((frame (make-frame
+		    `((parent-frame . ,(window-frame))
+		      (delete-before . ,(window-frame))
+		      (minibuffer . nil)
+		      (modeline . nil)
+		      (left . ,(- left border))
+		      (top . ,y)
+		      (width . (text-pixels . ,width))
+		      (height . (text-pixels . ,height))
+		      ;; (height . ,height)
+		      (child-frame-border-width . ,border)
+		      (internal-border-width . ,border)
+		      (background-color . ,background)
+		      (horizontal-scroll-bars . nil)
+		      (menu-bar-lines . 0)
+		      (tool-bar-lines . 0)
+		      (desktop-dont-save . t)
+		      (unsplittable . nil)
+		      (no-other-frame . t)
+		      (undecorated . t)
+		      (pixelwise . t)
+		      (visibility . t)))))
+	(set-face-attribute 'child-frame-border t :background child-frame-border)
+	frame)))
+#+end_src
+
+#+begin_src emacs-lisp
+  (defun my/mini-frame-reset (frame)
+    "Reset FRAME size and position.
+
+    Move frame at the top of parent frame and resize it
+    horizontally to fit the width of current selected window."
+  
+    (interactive)
+    (let* ((border (frame-parameter frame 'internal-border-width))
+	   (height (frame-parameter frame 'height)))
+      (with-selected-frame (frame-parent frame)
+	(let* ((edges (window-pixel-edges))
+	       (body-edges (window-body-pixel-edges))
+	       (top (nth 1 edges))
+	       (bottom (nth 3 body-edges))
+	       (left (- (nth 0 edges) (or left-fringe-width 0)))
+	       (right (+ (nth 2 edges) (or right-fringe-width 0)))
+	       (width (- right left))
+	       (y (- top border)))
+	  (set-frame-width frame width nil t)
+	  (set-frame-height frame height)
+	  (set-frame-position frame (- left border) y)))))
+#+end_src
+
+#+begin_src emacs-lisp
+  (defun my/mini-frame-shrink (frame &optional delta)
+    "Make the FRAME DELTA lines smaller.
+
+    If no argument is given, make the frame one line smaller. If
+    DELTA is negative, enlarge frame by -DELTA lines."
+
+    (interactive)
+    (let ((delta (or delta -1)))
+      (when (and (framep frame)
+		 (frame-live-p frame)
+		 (frame-visible-p frame))
+	(set-frame-parameter frame 'height
+			     (+ (frame-parameter frame 'height) delta)))))
+#+end_src
+
+** Configuration
+*** General
+This section is meant to ease the writing of the configuration file using a dedicated minor mode (my/config-mode) with a few key bindings:
+C-` : Toggle navigation sidebar C-c C-p : Go to previous subsection C-c C-n : Go to next subsection C-c C-S-p : Go to previous section C-c C-S-n : Go to next section C-c t : Fold code blocks C-c f : Filter block visibility (sidebar) C-c C-v t : Export (tangle) code C-c C-v s : Execute current subsection
+Before being able to use it, you need to execute the whole subtree using org-babel-execute-subtree (generally bound to C-c C-v s).
+
+*** Sidebar
+This defines an org sidebar using imenu-list.
+#+begin_src emacs-lisp
+  (require 'imenu)
+  (require 'imenu-list)
+
+  (defun my/org-tree-to-indirect-buffer ()
+    "Create indirect buffer, narrow it to current subtree and unfold blocks"
+  
+    (org-tree-to-indirect-buffer)
+    (org-show-block-all)
+    (setq-local my/org-blocks-hidden nil))
+
+  (defun my/org-sidebar ()
+    "Open an imenu list on the left that allow navigation."
+  
+    (interactive)
+    (setq imenu-list-after-jump-hook #'my/org-tree-to-indirect-buffer
+	  imenu-list-position 'left
+	  imenu-list-size 36
+	  imenu-list-focus-after-activation t)
+
+    (let ((heading (substring-no-properties (or (org-get-heading t t t t) ""))))
+      (when (buffer-base-buffer)
+	(switch-to-buffer (buffer-base-buffer)))
+      (imenu-list-minor-mode)
+      (imenu-list-stop-timer)
+      (hl-line-mode)
+      (face-remap-add-relative 'hl-line :inherit 'nano-subtle)
+      (setq header-line-format
+	    '(:eval
+	      (nano-modeline-render nil
+				    (buffer-name imenu-list--displayed-buffer)
+				    "(outline)"
+				    "")))
+      (setq-local cursor-type nil)
+      (when (> (length heading) 0)
+	(goto-char (point-min))
+	(search-forward heading)
+	(imenu-list-display-dwim))))
+#+end_src
+
+This toggles the org-sidebar.
+#+begin_src emacs-lisp
+  (defun my/org-sidebar-toggle ()
+    "Toggle the org-sidebar"
+
+    (interactive)
+    (if (get-buffer-window "*Ilist*")
+	(progn 
+	  (quit-window nil (get-buffer-window "*Ilist*"))
+	  (switch-to-buffer (buffer-base-buffer)))
+      (my/org-sidebar)))
+#+end_src
+
+Make sure tangle is applied to the base buffer and not the subtree.
+#+begin_src emacs-lisp
+  (defun my/org-babel-tangle ()
+    "Write code blocks to source-specific files from the base buffer."
+
+    (interactive)
+    (with-current-buffer (or (buffer-base-buffer)
+			     (current-buffer))
+      (org-babel-tangle)))
+#+end_src
+
+Toggle code blocks folding, starting folded.
+#+begin_src emacs-lisp
+  (defvar my/org-blocks-hidden nil)
+
+  (defun my/org-toggle-blocks ()
+    "Toggle code blocks folding."
+  
+    (interactive)
+    (if my/org-blocks-hidden
+	(org-show-block-all)
+      (org-hide-block-all))
+    (setq-local my/org-blocks-hidden (not my/org-blocks-hidden)))
+
+  (add-hook 'config-mode-hook #'my/org-toggle-blocks)
+#+end_src
+
+#+begin_src emacs-lisp
+  (defvar my/imenu-list-folding-status t
+    "Folding status of the imenu-list")
+
+  (defun my/imenu-list-toggle-folding ()
+    "Toggle top level nodes of the imenu-list buffer"
+  
+    (interactive)
+    (with-current-buffer "*Ilist*"
+      (save-excursion
+	(goto-char (point-min))
+	(while (re-search-forward "^\\+ " nil t)
+	  (if my/imenu-list-folding-status
+	      (hs-hide-block)
+	    (hs-show-block)))
+	(setq my/imenu-list-folding-status (not my/imenu-list-folding-status)))))
+
+  (bind-key "S-<tab>" #'my/imenu-list-toggle-folding imenu-list-major-mode-map)
+#+end_src
+
+Some information for when a top node is closed
+#+begin_src emacs-lisp
+  (defun my/display-code-line-counts (ov)
+    (when (eq 'code (overlay-get ov 'hs))
+      (overlay-put ov 'display
+		   (propertize
+		    (format " [%d sections] … "
+			    (- (count-lines (overlay-start ov)
+					 (overlay-end ov)) 1))
+		    'face 'nano-faded))))
+
+  (setq hs-set-up-overlay #'my/display-code-line-counts)
+#+end_src
+
+#+begin_src emacs-lisp
+  (defun my/imenu-list-display-dwim ()
+    "Display or toggle the entry at `point'."
+    (interactive)
+    (save-selected-window
+      (save-excursion
+	(my/imenu-list-ret-dwim))))
+
+  (defun my/imenu-list-ret-dwim ()
+    "Jump to or toggle the entry at `point'."
+    (interactive)
+    (save-excursion
+      (let ((entry (imenu-list--find-entry)))
+	(when (imenu--subalist-p entry)
+	  (setq entry (cons
+		       (car entry)
+		       (get-text-property 0 'marker (car entry)))))
+	(imenu-list--goto-entry entry))))
+
+  (bind-key "<SPC>" #'my/imenu-list-display-dwim imenu-list-major-mode-map)
+  (bind-key "<return>" #'my/imenu-list-ret-dwim imenu-list-major-mode-map)
+#+end_src
+
+*** Filter
+This provide the my/org-imenu-filter that allow to filter sidebar entries using the specified expression (e.g. “+HOOK +DEFER”).
+#+begin_src emacs-lisp
+  (bind-key "C-c f" #'my/org-imenu-filter)
+  (bind-key "f" #'my/org-imenu-filter imenu-list-major-mode-map)
+  (bind-key "U" #'imenu-list-refresh imenu-list-major-mode-map)
+#+end_src
+
+3 levels for org-imenu
+#+begin_src emacs-lisp
+  (setq org-imenu-depth 3)
+#+end_src
+
+#+begin_src emacs-lisp
+  (require 'org)
+  (require 'svg-tag-mode)
+
+  (defvar my/org-imenu-filter-history
+    '("BINDING" "HOOK" "ADVICE" "FACE" "MODE" "DEFER"
+      "PERSONAL" "INACTIVE" "BUGFIX" "OTHER" "TIMER" "OS")
+    "Filter history list.")
+
+  (defvar my/org-imenu-filter-function
+    (cdr (org-make-tags-matcher "*"))
+    "Filter function to decide if a headline is kept")
+
+  (defun my/org-imenu-filter ()
+    "Define and apply a new filter"
+  
+    (interactive)
+    (let* ((match (completing-read-multiple
+		   "FILTER: "
+		   my/org-imenu-filter-history
+		   nil nil nil
+		   'my/org-imenu-filter-history))
+	   (match (mapconcat #'identity match " ")))
+      (when (string= "" match)
+	(setq match "*"))
+      (setq my/org-imenu-filter-function
+	    (cdr (org-make-tags-matcher match)))
+      (imenu-list-refresh)))
+
+
+  (defun my/org-imenu-filter-tree (&optional bound parent-match)
+    "Build a imenu list using current filter function"
+  
+    (let* ((headlines '()))
+      (save-excursion
+	(org-with-wide-buffer
+	 (unless bound
+	   (setq bound (point-max))
+	   (goto-char (point-min)))
+	 (while (re-search-forward org-heading-regexp bound t)
+	   (let* ((element (org-element-at-point))
+		  (begin (org-element-property :begin element))
+		  (end (org-element-property :end element))
+		  (marker (copy-marker begin))
+		  (level (org-element-property :level element))
+		  (tags (save-excursion
+			   (goto-char begin)
+			    (org-get-tags)))
+		  (match (save-excursion
+			   (goto-char begin)
+			   (funcall my/org-imenu-filter-function
+				    nil (org-get-tags) level)))
+                
+		  (title (org-element-property :raw-value element))
+		  (title (org-link-display-format
+			  (substring-no-properties title)))
+		  (title (propertize title 'org-imenu-marker marker
+					   'org-imenu t))
+		  (title (if (member "INACTIVE" tags)
+			     (propertize title 'face 'nano-faded)
+			   title))
+		  (svg-tags (mapconcat #'(lambda (tag)
+				       (propertize tag 'display (svg-tag-make tag :face 'nano-faded)))
+				   tags " "))
+		  (title (if tags (format "%s %s" title svg-tags) title))
+		  (title (propertize title 'marker marker))
+		  (children (my/org-imenu-filter-tree end match)))
+	     (goto-char end)
+
+	     (cond ((> level org-imenu-depth)
+		    nil)
+		   ((> (length children) 0)
+		    (add-to-list 'headlines (append (list title) children) t))
+		   ((or match parent-match)
+		    (add-to-list 'headlines (cons title marker) t)))))))
+      headlines))
+
+  (advice-add #'org-imenu-get-tree :override #'my/org-imenu-filter-tree)
+#+end_src
+
+*** Configuration Mode
+This section defines the my/config-mode to ease navigating and interacting with the configuration file.
+Navigation commands using the ilist menu.
+#+begin_src emacs-lisp
+  (defun my/config-mode-prev-header ()
+    "Move to previous header"
+  
+    (interactive)
+    (with-current-buffer "*Ilist*"
+      (search-backward-regexp "^  ")
+      (imenu-list-display-dwim)))
+
+  (defun my/config-mode-next-header ()
+    "Move to next header"
+    
+    (interactive)
+    (with-current-buffer "*Ilist*"
+      (forward-line)
+      (search-forward-regexp "^  ")
+      (imenu-list-display-dwim)))
+
+  (defun my/config-mode-prev-section ()
+    "Move to previous section"
+    
+    (interactive)
+    (with-current-buffer "*Ilist*"
+      (search-backward-regexp "\\+ " nil nil 2)
+      (forward-line)
+      (imenu-list-display-dwim)))
+
+  (defun my/config-mode-next-section ()
+    "Move to next section"
+    
+    (interactive)
+    (with-current-buffer "*Ilist*"
+      (previous-line)
+      (search-forward-regexp "\\+ ")
+      (forward-line)
+      (imenu-list-display-dwim)))
+#+end_src
+
+A minor mode for configuration
+#+begin_src emacs-lisp
+  (define-minor-mode my/config-mode
+    "Configuration mode"
+  
+    :init-value nil
+    :global nil
+    :keymap (let* ((map (make-sparse-keymap)))
+	      (bind-key "C-c C-p"   #'my/config-mode-prev-header map)
+	      (bind-key "C-c C-n"   #'my/config-mode-next-header map)
+	      (bind-key "C-c C-S-p" #'my/config-mode-prev-section map)
+	      (bind-key "C-c C-S-n" #'my/config-mode-next-section map)
+	      (bind-key "C-`"       #'my/org-sidebar-toggle map)
+	      (bind-key "C-c C-v t" #'my/org-babel-tangle map)
+	      (bind-key "C-c t"     #'my/org-toggle-blocks map)
+	      map)
+
+    (require 'org)
+    (if my/config-mode
+	(my/org-sidebar)))
+#+end_src
+
+A shortcut to edit configuration
+#+begin_src emacs-lisp
+  (defun my/config ()
+    "Create a new for editing configuration"
+
+    (interactive)
+    (select-frame (make-frame '((name . "my/config")
+				(width . 150)
+				(height . 45))))
+    (find-file "~/Documents/GitHub/dotemacs/dotemacs.org")
+    (my/config-mode))
+#+end_src
+
+An autoload function for my/config (that will load org mode).
+#+begin_src emacs-lisp
+  (autoload 'my/config
+    (expand-file-name "init.el" user-emacs-directory)
+    "Autoloaded my/config command."
+    t)
+#+end_src
+
+*** Auto Tangle
+Automatically tangle org-mode files with the option #+auto_tangle: t
+#+begin_src emacs-lisp
+  (add-hook 'org-mode-hook 'org-auto-tangle-mode)
+#+end_src
+
+
+* Interface
+** Frame
+Default frame geometry (large margin: 24 pixels).
+#+begin_src emacs-lisp
+  (require 'frame)
+
+  ;; Default frame settings
+  (setq default-frame-alist '((min-height . 1)  '(height . 45)
+			      (min-width  . 1)  '(width  . 81)
+			      (vertical-scroll-bars . nil)
+			      (internal-border-width . 24)
+			      (left-fringe . 0)
+			      (right-fringe . 0)
+			      (tool-bar-lines . 0)
+			      (menu-bar-lines . 0)))
+
+  ;; Default frame settings
+  (setq initial-frame-alist default-frame-alist)
+#+end_src
+
+** Window
+Margin and divider mode.
+#+begin_src emacs-lisp
+  (setq-default window-divider-default-right-width 24
+		window-divider-default-places 'right-only
+		left-margin-width 0
+		right-margin-width 0
+		window-combination-resize nil) ; Do not resize windows proportionally
+
+  (window-divider-mode 1)
+#+end_src
+
+** Buffer
+Size of temporary buffers
+#+begin_src emacs-lisp
+  (temp-buffer-resize-mode)
+  (setq temp-buffer-max-height 8)
+#+end_src
+
+Unique buffer names
+#+begin_src emacs-lisp
+  (require 'uniquify)
+
+  (setq uniquify-buffer-name-style 'reverse
+	uniquify-separator " • "
+	uniquify-after-kill-buffer-p t
+	uniquify-ignore-buffers-re "^\\*")
+#+end_src
+
+No question after killing a buffer (kill-buffer asks you which buffer to switch to)
+#+begin_src emacs-lisp
+  (bind-key "C-x k" #'kill-current-buffer)
+#+end_src
+
+** File
+Follow symlinks without prompt
+#+begin_src emacs-lisp
+  (setq vc-follow-symlinks t)
+#+end_src
+
+** Dialogs
+Emacs can use a large number of dialogs and popups. Here we get rid of them.
+#+begin_src emacs-lisp
+  (setq-default show-help-function nil    ; No help text
+		use-file-dialog nil       ; No file dialog
+		use-dialog-box nil        ; No dialog box
+		pop-up-windows nil)       ; No popup windows
+
+  (tooltip-mode -1)                       ; No tooltips
+  (scroll-bar-mode -1)                    ; No scroll bars
+  (tool-bar-mode -1)                      ; No toolbar
+#+end_src
+
+** Kayboard
+The mode displays the key bindings following your currently entered incomplete command (a ;; prefix) in a popup.
+#+begin_src emacs-lisp
+  (require 'which-key)
+
+  (which-key-mode)
+#+end_src
+
+** Text
+#+begin_src emacs-lisp
+  (setq-default use-short-answers t                     ; Replace yes/no prompts with y/n
+		confirm-nonexistent-file-or-buffer nil) ; Ok to visit non existent files
+#+end_src
+
+Replace region when inserting text
+#+begin_src emacs-lisp
+  (delete-selection-mode 1)
+#+end_src
+
+** Sound
+Disable the bell (auditory or visual).
+#+begin_src emacs-lisp
+  (setq-default visible-bell nil             ; No visual bell      
+		ring-bell-function 'ignore)  ; No bell
+#+end_src
+
+** Mouse
+Mouse behavior can be finely controlled using the mouse-avoidance-mode.
+#+begin_src emacs-lisp
+  (setq-default mouse-yank-at-point t) ; Yank at point rather than pointer
+  (mouse-avoidance-mode 'exile)        ; Avoid collision of mouse with point
+#+end_src
+
+** Scroll
+#+begin_src emacs-lisp
+  (setq-default scroll-conservatively 101       ; Avoid recentering when scrolling far
+		scroll-margin 2                 ; Add a margin when scrolling vertically
+		recenter-positions '(5 bottom)) ; Set re-centering positions
+#+end_src
+
+** Clipboard
+Allows system and Emacs clipboard to communicate smoothly (both ways)
+#+begin_src emacs-lisp
+  (setq-default select-enable-clipboard t) ; Merge system's and Emacs' clipboard
+#+end_src
+
+
+* Visual
+** Color
+A consistent theme for GNU Emacs. The light theme is based on Material colors and the dark theme is based on Nord colors. The theme is based on a set of six faces (only).
+#+begin_src emacs-lisp
+  (require 'nano-theme)
+  (setq nano-fonts-use t) ; Use theme font stack
+  (nano-light)            ; Use theme light version
+  (nano-mode)             ; Recommended settings
+
+
+  (defun my/set-face (face style)
+    "Reset FACE and make it inherit STYLE."
+    (set-face-attribute face nil
+			:foreground 'unspecified :background 'unspecified
+			:family     'unspecified :slant      'unspecified
+			:weight     'unspecified :height     'unspecified
+			:underline  'unspecified :overline   'unspecified
+			:box        'unspecified :inherit    style))
+  (my/set-face 'italic 'nano-faded)
+#+end_src
+
+We still want the transient nano splash screen
+#+begin_src emacs-lisp
+  (require 'nano-splash)
+#+end_src
+
+** Font
+#+begin_src emacs-lisp
+  (set-face-attribute 'default nil
+		      :family "Jetbrains Mono Nerd Font"
+		      :weight 'light
+		      :height 112)
+
+  (set-face-attribute 'bold nil
+		      :family "Roboto Mono"
+		      :weight 'regular)
+#+end_src
+
+** Typography
+#+begin_src emacs-lisp
+  (setq-default fill-column 80                          ; Default line width 
+		sentence-end-double-space nil           ; Use a single space after dots
+		bidi-paragraph-direction 'left-to-right ; Faster
+		truncate-string-ellipsis "…")           ; Nicer ellipsis
+#+end_src
+
+Changing the symbol for truncation (…) and wrap (↩).
+#+begin_src emacs-lisp
+  (require 'nano-theme)
+
+  ;; Nicer glyphs for continuation and wrap 
+  (set-display-table-slot standard-display-table
+			  'truncation (make-glyph-code ?… 'nano-faded))
+
+  (defface wrap-symbol-face
+    '((t (:family "Fira Code"
+	  :inherit nano-faded)))
+    "Specific face for wrap symbol")
+
+  (set-display-table-slot standard-display-table
+			  'wrap (make-glyph-code ?↩ 'wrap-symbol-face))
+#+end_src
+
+Make sure underline is positionned at the very bottom.
+#+begin_src emacs-lisp
+  (setq x-underline-at-descent-line nil
+	x-use-underline-position-properties t
+	underline-minimum-offset 10)
+#+end_src
+
+
+* Editing
+** Default
+Default & initial mode is text.
+#+begin_src emacs-lisp
+  (setq-default initial-major-mode 'text-mode   ; Initial mode is text
+		default-major-mode 'text-mode)  ; Default mode is text
+#+end_src
+
+Visual line mode for prog and text modes
+#+begin_src emacs-lisp
+  (add-hook 'text-mode-hook 'visual-line-mode)
+  (add-hook 'prog-mode-hook 'visual-line-mode)
+#+end_src
+
+** Tabulation
+No tabulation, ever.
+#+begin_src emacs-lisp
+  (setq-default indent-tabs-mode nil        ; Stop using tabs to indent
+		tab-always-indent 'complete ; Indent first then try completions
+		tab-width 4)                ; Smaller width for tab characters
+
+  ;; Let Emacs guess Python indent silently
+  (setq python-indent-guess-indent-offset t
+	python-indent-guess-indent-offset-verbose nil)
+#+end_src
+
+** Parenthesis
+Paren mode for highlighting matcing paranthesis
+#+begin_src emacs-lisp
+  (require 'paren)
+  ;; (setq show-paren-style 'expression)
+  (setq show-paren-style 'parenthesis)
+  (setq show-paren-when-point-in-periphery t)
+  (setq show-paren-when-point-inside-paren nil)
+  (show-paren-mode)
+#+end_src
+
+** Imenu List
+Imenu setup
+#+begin_src emacs-lisp
+  (require 'imenu-list)
+
+  (setq-default imenu-list-position 'left
+		imenu-max-item-length 1000)
+#+end_src
+
+** Highlighting
+Highlighting of the current line (native mode)
+#+begin_src emacs-lisp
+  (require 'hl-line)
+
+  (global-hl-line-mode)
+#+end_src
+
+** Pdf Tools
+#+begin_src emacs-lisp
+  ;; (require 'pdf-tools)
+
+  (add-hook 'doc-view-mode-hook 'pdf-tools-install)
+
+  (setq-default pdf-view-use-scaling t
+		pdf-view-use-imagemagick nil)
+#+end_src
+
+
+* Completion
+** Corfu
+Corfu enhances completion at point with a small completion popup.
+#+begin_src emacs-lisp
+  (require 'corfu)
+
+  (setq corfu-cycle t                ; Enable cycling for `corfu-next/previous'
+        corfu-auto t                 ; Enable auto completion
+        corfu-auto-delay 0.1        ; Delay before auto-completion shows up
+        corfu-separator ?\s          ; Orderless field separator
+        corfu-quit-at-boundary nil   ; Never quit at completion boundary
+        corfu-quit-no-match t        ; Quit when no match
+        corfu-preview-current nil    ; Disable current candidate preview
+        corfu-preselect-first nil    ; Disable candidate preselection
+        corfu-on-exact-match nil     ; Configure handling of exact matches
+        corfu-echo-documentation nil ; Disable documentation in the echo area
+        corfu-scroll-margin 5)       ; Use scroll margin
+
+  (global-corfu-mode)
+#+end_src
+
+A few more useful configurations…
+#+begin_src emacs-lisp
+  ;; TAB cycle if there are only few candidates
+  (setq completion-cycle-threshold 3)
+
+  ;; Emacs 28: Hide commands in M-x which do not apply to the current mode.
+  ;; Corfu commands are hidden, since they are not supposed to be used via M-x.
+  (setq read-extended-command-predicate
+        #'command-completion-default-include-p)
+
+  ;; Enable indentation+completion using the TAB key.
+  ;; completion-at-point is often bound to M-TAB.
+  (setq tab-always-indent 'complete)
+
+  ;; Completion in source blocks
+  (require 'cape)
+
+  (add-to-list 'completion-at-point-functions 'cape-symbol)
+#+end_src
+
+** Orderless
+Allow completion based on space-separated tokens, out of order.
+#+begin_src emacs-lisp
+  (require 'orderless)
+  
+  (setq completion-styles '(substring orderless basic)
+	orderless-component-separator 'orderless-escapable-split-on-space
+	read-file-name-completion-ignore-case t
+	read-buffer-completion-ignore-case t
+	completion-ignore-case t)
+#+end_src
+
+
+* Minibuffer and Modeline
+** Consult
+We replace some of emacs functions with their consult equivalent
+#+begin_src emacs-lisp
+  (require 'consult)
+
+  (setq consult-preview-key nil) ; No live preview
+
+  (bind-key "C-x C-r" #'consult-recent-file)
+  (bind-key "C-x h"   #'consult-outline)
+  (bind-key "C-x b"   #'consult-buffer)
+  (bind-key "C-c h"   #'consult-history)
+  ;; (bind-key "M-:"     #'consult-complex-command)
+#+end_src
+
+** Vertico
+Vertico provides a performant and minimalistic vertical completion UI based on the default completion system but aims to be highly flexible, extensible and modular.
+#+begin_src emacs-lisp
+  (require 'vertico)
+
+  ;; (setq completion-styles '(basic substring partial-completion flex))
+
+  (setq vertico-resize nil        ; How to resize the Vertico minibuffer window.
+	vertico-count 8           ; Maximal number of candidates to show.
+	vertico-count-format nil) ; No prefix with number of entries
+
+  (vertico-mode)
+#+end_src
+
+Tweaking settings
+#+begin_src emacs-lisp
+(setq vertico-grid-separator
+      #("  |  " 2 3 (display (space :width (1))
+                             face (:background "#ECEFF1")))
+
+      vertico-group-format
+      (concat #(" " 0 1 (face vertico-group-title))
+              #(" " 0 1 (face vertico-group-separator))
+              #(" %s " 0 4 (face vertico-group-title))
+              #(" " 0 1 (face vertico-group-separator
+                          display (space :align-to (- right (-1 . right-margin) (- +1)))))))
+
+(set-face-attribute 'vertico-group-separator nil
+                    :strike-through t)
+(set-face-attribute 'vertico-current nil
+                    :inherit '(nano-strong nano-subtle))
+(set-face-attribute 'completions-first-difference nil
+                    :inherit '(nano-default))
+#+end_src
+
+Bind shift-tab for completion
+#+begin_src emacs-lisp
+  (bind-key "<backtab>" #'minibuffer-complete vertico-map)
+#+end_src
+
+Completion-at-point and completion-in-region (see https://github.com/minad/vertico#completion-at-point-and-completion-in-region)
+#+begin_src emacs-lisp
+  (setq completion-in-region-function
+	(lambda (&rest args)
+	  (apply (if vertico-mode
+		     #'consult-completion-in-region
+		   #'completion--in-region)
+		 args)))
+#+end_src
+
+See https://kristofferbalintona.me/posts/vertico-marginalia-all-the-icons-completion-and-orderless/#vertico
+#+begin_src emacs-lisp
+  (defun vertico--prompt-selection ()
+    "Highlight the prompt"
+
+    (let ((inhibit-modification-hooks t))
+      (set-text-properties (minibuffer-prompt-end) (point-max)
+			   '(face (nano-strong nano-salient)))))
+#+end_src
+
+See minad/vertico#145
+#+begin_src emacs-lisp
+  (defun minibuffer-vertico-setup ()
+
+    (setq truncate-lines t)
+    (setq completion-in-region-function
+	  (if vertico-mode
+	      #'consult-completion-in-region
+	    #'completion--in-region)))
+
+  (add-hook 'vertico-mode-hook #'minibuffer-vertico-setup)
+  (add-hook 'minibuffer-setup-hook #'minibuffer-vertico-setup)
+#+end_src
+
+** Marginalia
+#+begin_src emacs-lisp
+  (require 'marginalia)
+
+  (setq-default marginalia--ellipsis "…"    ; Nicer ellipsis
+		marginalia-align 'right     ; right alignment
+		marginalia-align-offset -1) ; one space on the right
+
+  (marginalia-mode)
+#+end_src
+
+** Modeline
+We’re using nano-modeline and modify some settings here.
+#+begin_src emacs-lisp
+  (require 'nano-theme)
+  (require 'nano-modeline)
+
+  (setq nano-modeline-prefix 'status)
+  (setq nano-modeline-prefix-padding 1)
+
+  (set-face-attribute 'header-line nil)
+  (set-face-attribute 'mode-line nil
+                      :foreground (face-foreground 'nano-subtle-i)
+                      :background (face-foreground 'nano-subtle-i)
+                      :inherit nil
+                      :box nil)
+  (set-face-attribute 'mode-line-inactive nil
+                      :foreground (face-foreground 'nano-subtle-i)
+                      :background (face-foreground 'nano-subtle-i)
+                      :inherit nil
+                      :box nil)
+
+  (set-face-attribute 'nano-modeline-active nil
+                      :background (face-background 'nano-subtle)
+                      :inherit '(nano-default-)
+                      :box nil)
+  (set-face-attribute 'nano-modeline-inactive nil
+                      :foreground 'unspecified
+                      :background (face-background 'nano-subtle)
+                      :box nil)
+#+end_src
+
+We set a thin modeline
+#+begin_src emacs-lisp
+  (defun my/thin-modeline ()
+    "Transform the modeline in a thin faded line"
+  
+    (setq mode-line-format (list ""))
+    (setq-default mode-line-format (list ""))
+    (set-face-attribute 'mode-line nil
+                        :box nil
+                        :inherit nil
+                        :foreground (face-background 'nano-subtle)
+                        :background (face-background 'nano-subtle)
+                        :height 0.1)
+    (set-face-attribute 'mode-line-inactive nil
+                        :box nil
+                        :inherit nil
+                        :foreground (face-background 'nano-subtle)
+                        :background (face-background 'nano-subtle)
+                        :height 0.1))
+
+  (add-hook 'emacs-startup-hook #'my/thin-modeline)
+#+end_src
+
+We start the nano modeline.
+#+begin_src emacs-lisp
+  (add-hook 'prog-mode-hook            #'nano-modeline-prog-mode)
+  (add-hook 'text-mode-hook            #'nano-modeline-text-mode)
+  (add-hook 'org-mode-hook             #'nano-modeline-org-mode)
+  (add-hook 'pdf-view-mode-hook        #'nano-modeline-pdf-mode)
+  (add-hook 'mu4e-headers-mode-hook    #'nano-modeline-mu4e-headers-mode)
+  (add-hook 'mu4e-view-mode-hook       #'nano-modeline-mu4e-message-mode)
+  (add-hook 'elfeed-show-mode-hook     #'nano-modeline-elfeed-entry-mode)
+  (add-hook 'elfeed-search-mode-hook   #'nano-modeline-elfeed-search-mode)
+  (add-hook 'term-mode-hook            #'nano-modeline-term-mode)
+  (add-hook 'xwidget-webkit-mode-hook  #'nano-modeline-xwidget-mode)
+  (add-hook 'messages-buffer-mode-hook #'nano-modeline-message-mode)
+  (add-hook 'org-capture-mode-hook     #'nano-modeline-org-capture-mode)
+  (add-hook 'org-agenda-mode-hook      #'nano-modeline-org-agenda-mode)
+#+end_src
+
+
+* ORG
+** Structural Templates
+#+begin_src emacs-lisp
+  (require 'org-tempo)
+  (dolist (item '(("sh" . "src sh")
+		  ("el" . "src emacs-lisp")
+		  ("li" . "src lisp")
+		  ("sc" . "src scheme")
+		  ("ts" . "src typescript")
+		  ("py" . "src python")
+		  ("go" . "src go")
+		  ("yaml" . "src yaml")
+		  ("json" . "src json")))
+    (add-to-list 'org-structure-template-alist item))
+#+end_src
